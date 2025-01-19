@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <curand_kernel.h>
+#include <string>
 #include <stdint.h>
 
 namespace eth_cracker {

@@ -33,10 +33,12 @@ set_target_properties(eth_cracker PROPERTIES
 # Include directories
 target_include_directories(eth_cracker PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CUDA_INCLUDE_DIRS}
 )
 
 # Link libraries
 target_link_libraries(eth_cracker PRIVATE
     cuda
     cudart
+    curand
 ) 

@@ -19,11 +19,11 @@ struct CurvePoint {
     bool infinity;
 };
 
-// Constants for secp256k1
-__constant__ FieldElement SECP256K1_P;  // Prime field modulus
-__constant__ FieldElement SECP256K1_A;  // Curve parameter a
-__constant__ FieldElement SECP256K1_B;  // Curve parameter b
-__constant__ CurvePoint SECP256K1_G;    // Generator point
+// Constants for secp256k1 (declared here, defined in .cu file)
+extern __constant__ FieldElement SECP256K1_P;  // Prime field modulus
+extern __constant__ FieldElement SECP256K1_A;  // Curve parameter a
+extern __constant__ FieldElement SECP256K1_B;  // Curve parameter b
+extern __constant__ CurvePoint SECP256K1_G;    // Generator point
 
 // Device functions for field arithmetic
 __device__ void fieldAdd(FieldElement* result, const FieldElement* a, const FieldElement* b);

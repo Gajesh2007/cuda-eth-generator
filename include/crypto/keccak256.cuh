@@ -15,8 +15,8 @@ struct KeccakState {
 constexpr int KECCAK_ROUNDS = 24;
 constexpr int KECCAK_RATE = 1088;  // Rate for Keccak-256 (1600 - 512)
 
-// Device constants for Keccak round constants
-__constant__ uint64_t KECCAK_ROUND_CONSTANTS[24];
+// Device constants for Keccak round constants (declared here, defined in .cu file)
+extern __constant__ uint64_t KECCAK_ROUND_CONSTANTS[24];
 
 // Core Keccak-f[1600] permutation
 __device__ void keccakF1600(KeccakState* state);
