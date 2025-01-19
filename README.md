@@ -21,7 +21,7 @@ A high-performance, multi-GPU Ethereum vanity address generator implemented in C
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/cuda-eth-cracker.git
+   git clone https://github.com/Gajesh2007/cuda-eth-generator.git
    cd cuda-eth-cracker
    ```
 
