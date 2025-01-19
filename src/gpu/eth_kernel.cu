@@ -102,7 +102,7 @@ __global__ void generateAndCheckAddresses(
     
     // Update RNG state and key counter
     states[idx] = localState;
-    atomicAdd(keysChecked, 1);
+    atomicAdd((unsigned long long int*)keysChecked, 1ULL);
 }
 
 // Host-side initialization
