@@ -10,17 +10,17 @@
 
 namespace eth_cracker {
 
-GPUManager::GPUManager() : isRunning_(false), totalKeysChecked_(0), lastCheckTime_(std::chrono::steady_clock::now()), lastKeysChecked_(0) {}
+GPUManager::GPUManager() : isRunning_(false), totalKeysChecked_(0), lastCheckTime_(std::chrono::steady_clock::now()), lastKeysChecked_(0), lastRate_(0.0) {}
 
 GPUManager::~GPUManager() {
     stopCracking();
 }
 
-bool GPUManager::initializeGPUs() {
+bool GPUManager::initialize() {
     int deviceCount;
     cudaError_t error = cudaGetDeviceCount(&deviceCount);
     if (error != cudaSuccess) {
-        std::cerr << "Failed to get CUDA device count: " << cudaGetErrorString(error) << std::endl;
+        std::cerr << "Failed to get device count: " << cudaGetErrorString(error) << std::endl;
         return false;
     }
     
@@ -32,7 +32,7 @@ bool GPUManager::initializeGPUs() {
     std::cout << "Found " << deviceCount << " CUDA device(s)" << std::endl;
     
     // Initialize each device
-    for (int i = 0; i < deviceCount; ++i) {
+    for (int i = 0; i < deviceCount; i++) {
         if (!initializeDevice(i)) {
             std::cerr << "Failed to initialize device " << i << std::endl;
             return false;
@@ -45,7 +45,7 @@ bool GPUManager::initializeGPUs() {
 bool GPUManager::initializeDevice(int deviceId) {
     cudaError_t error = cudaSetDevice(deviceId);
     if (error != cudaSuccess) {
-        std::cerr << "Failed to set CUDA device: " << cudaGetErrorString(error) << std::endl;
+        std::cerr << "Failed to set device " << deviceId << ": " << cudaGetErrorString(error) << std::endl;
         return false;
     }
     
@@ -259,10 +259,6 @@ double GPUManager::getKeysPerSecond() {
         return 0.0;
     }
 
-    auto now = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - lastCheckTime_);
-    if (duration.count() == 0) return 0.0;
-    
     // Get current counters from all devices
     std::vector<uint64_t> deviceCounts;
     uint64_t currentTotal = 0;
@@ -279,7 +275,8 @@ double GPUManager::getKeysPerSecond() {
             }
             
             // Get current count
-            error = cudaMemcpyAsync(device.keysChecked.get(), device.d_keysChecked,
+            uint64_t currentCount = 0;
+            error = cudaMemcpyAsync(&currentCount, device.d_keysChecked,
                                   sizeof(uint64_t), cudaMemcpyDeviceToHost, device.stream);
             if (error != cudaSuccess) {
                 std::cerr << "Failed to copy counter from device " << device.deviceId << ": " << cudaGetErrorString(error) << std::endl;
@@ -292,8 +289,8 @@ double GPUManager::getKeysPerSecond() {
                 continue;
             }
             
-            deviceCounts.push_back(*device.keysChecked);
-            currentTotal += *device.keysChecked;
+            deviceCounts.push_back(currentCount);
+            currentTotal += currentCount;
             
             // Check for match
             FoundMatch hostResult = {0};
@@ -330,11 +327,17 @@ double GPUManager::getKeysPerSecond() {
         return 0.0;
     }
     
-    double rate = static_cast<double>(currentTotal - lastKeysChecked_) / duration.count();
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastCheckTime_);
+    if (duration.count() == 0) return lastRate_; // Return last known rate if duration is too small
+    
+    // Calculate rate in keys per second
+    double rate = static_cast<double>(currentTotal - lastKeysChecked_) / (duration.count() / 1000.0);
     
     // Update last values for next calculation
     lastKeysChecked_ = currentTotal;
     lastCheckTime_ = now;
+    lastRate_ = rate; // Store current rate
     
     // Calculate total keyspace and probability
     const uint256_t TOTAL_KEYSPACE("115792089237316195423570985008687907852837564279074904382605163141518161494337");
@@ -376,6 +379,65 @@ uint64_t GPUManager::getTotalKeysChecked() const {
         }
     }
     return total;
+}
+
+bool GPUManager::launchKernel(GPUDevice* device, dim3 blocks, dim3 threads,
+                            const std::string& targetPattern, bool isFullAddress,
+                            FoundMatch* result, uint64_t* keysChecked) {
+    cudaError_t error = cudaSetDevice(device->deviceId);
+    if (error != cudaSuccess) {
+        std::cerr << "Failed to set device " << device->deviceId << ": " << cudaGetErrorString(error) << std::endl;
+        return false;
+    }
+    
+    // Launch kernel
+    generateAndCheckAddresses<<<blocks, threads, 0, device->stream>>>(
+        static_cast<curandState*>(device->d_rngStates),
+        static_cast<const char*>(device->d_targetPattern),
+        targetPattern.length(),
+        isFullAddress,
+        static_cast<FoundMatch*>(device->d_result),
+        static_cast<uint64_t*>(device->d_keysChecked)
+    );
+    
+    error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        std::cerr << "Failed to launch kernel: " << cudaGetErrorString(error) << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
+bool GPUManager::initializeKernel(GPUDevice* device, dim3 blocks, dim3 threads) {
+    cudaError_t error = cudaSetDevice(device->deviceId);
+    if (error != cudaSuccess) {
+        std::cerr << "Failed to set device " << device->deviceId << ": " << cudaGetErrorString(error) << std::endl;
+        return false;
+    }
+    
+    // Initialize RNG states with different seeds for each thread
+    unsigned int seed = std::chrono::system_clock::now().time_since_epoch().count();
+    seed += device->deviceId * 1000000;  // Make sure each GPU gets different seeds
+    
+    initRNG<<<blocks, threads, 0, device->stream>>>(
+        seed,
+        static_cast<curandState*>(device->d_rngStates)
+    );
+    
+    error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        std::cerr << "Failed to initialize RNG states: " << cudaGetErrorString(error) << std::endl;
+        return false;
+    }
+    
+    error = cudaStreamSynchronize(device->stream);
+    if (error != cudaSuccess) {
+        std::cerr << "Failed to synchronize after RNG init: " << cudaGetErrorString(error) << std::endl;
+        return false;
+    }
+    
+    return true;
 }
 
 } // namespace eth_cracker 

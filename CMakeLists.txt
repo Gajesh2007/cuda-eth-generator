@@ -17,7 +17,7 @@ set(CMAKE_CUDA_ARCHITECTURES 75 80 86)  # Adjust these based on your GPU archite
 set(SOURCES
     src/main.cpp
     src/gpu/eth_kernel.cu
-    src/gpu/gpu_manager.cpp
+    src/gpu/gpu_manager.cu
     src/crypto/secp256k1.cu
     src/crypto/keccak256.cu
 )

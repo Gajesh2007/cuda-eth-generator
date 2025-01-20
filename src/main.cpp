@@ -57,27 +57,28 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
     
     try {
-        eth_cracker::GPUManager gpuManager;
+        eth_cracker::GPUManager manager;
         
-        if (!gpuManager.initializeGPUs()) {
-            std::cerr << "Failed to initialize GPUs\n";
+        // Initialize GPUs
+        if (!manager.initialize()) {
+            std::cerr << "Failed to initialize GPUs" << std::endl;
             return 1;
         }
         
         std::cout << "Starting address search for pattern: " << targetPattern << "\n";
-        if (!gpuManager.startCracking(targetPattern, isFullAddress)) {
+        if (!manager.startCracking(targetPattern, isFullAddress)) {
             std::cerr << "Failed to start cracking process\n";
             return 1;
         }
         
         // Main loop - print statistics until interrupted
         while (g_running) {
-            gpuManager.getKeysPerSecond();  // This will print progress
+            manager.getKeysPerSecond();  // This will print progress
             std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Update 10 times per second
         }
         
         std::cout << "\nStopping...\n";
-        gpuManager.stopCracking();
+        manager.stopCracking();
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

@@ -41,8 +41,8 @@ __global__ void generateAndCheckAddresses(
     curandState localState = states[idx];
     uint64_t localKeysChecked = 0;
     
-    // Each thread processes multiple keys
-    for (int batch = 0; batch < KEYS_PER_THREAD && !result->found; batch++) {
+    // Run continuously until a match is found
+    while (!result->found) {
         // Generate private key
         uint8_t privateKey[PRIVKEY_LEN];
         for (int i = 0; i < PRIVKEY_LEN; i++) {
@@ -88,6 +88,12 @@ __global__ void generateAndCheckAddresses(
         
         localKeysChecked++;
         
+        // Update global counter periodically
+        if ((localKeysChecked & 0xFF) == 0) {  // Every 256 keys
+            atomicAdd((unsigned long long int*)keysChecked, 256ULL);
+            __threadfence();  // Make sure counter update is visible to host
+        }
+        
         // If found, store result atomically
         if (found) {
             // Use atomic operation on an int
@@ -99,15 +105,18 @@ __global__ void generateAndCheckAddresses(
                 for (int i = 0; i < ETH_ADDR_LEN; i++) {
                     result->address[i] = address[i];
                 }
-                __threadfence();  // Ensure result is visible to host
+                // Make sure result is visible to host
+                __threadfence();
             }
-            break;  // Exit loop if found
+            break;  // Exit if we found a match
         }
     }
     
-    // Update RNG state and key counter
+    // Add remaining keys
+    atomicAdd((unsigned long long int*)keysChecked, localKeysChecked & 0xFF);
+    
+    // Save RNG state
     states[idx] = localState;
-    atomicAdd((unsigned long long int*)keysChecked, localKeysChecked);
 }
 
 // Host-side initialization

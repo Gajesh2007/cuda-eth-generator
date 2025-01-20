@@ -215,32 +215,31 @@ class GPUManager {
 public:
     GPUManager();
     ~GPUManager();
-
-    // Initialize all available GPUs
-    bool initializeGPUs();
     
-    // Start the cracking process
-    bool startCracking(const std::string& targetPattern, bool isFullAddress);
+    // Delete copy constructor and assignment
+    GPUManager(const GPUManager&) = delete;
+    GPUManager& operator=(const GPUManager&) = delete;
     
-    // Stop all GPU operations
+    bool initialize();  // Initialize all available GPUs
+    bool startCracking(const std::string& targetPattern, bool isFullAddress = false);
     void stopCracking();
-    
-    // Get current statistics
     double getKeysPerSecond();
     uint64_t getTotalKeysChecked() const;
-
+    
 private:
-    std::vector<GPUDevice> devices_;
     bool isRunning_;
+    std::vector<GPUDevice> devices_;
     uint64_t totalKeysChecked_;
-    mutable uint64_t lastKeysChecked_;
-    mutable std::chrono::steady_clock::time_point lastCheckTime_;
+    std::chrono::steady_clock::time_point lastCheckTime_;
+    uint64_t lastKeysChecked_;
+    double lastRate_;  // Store last calculated rate
     
-    // Initialize a single GPU
-    bool initializeDevice(int deviceId);
-    
-    // Calculate optimal kernel launch parameters for a device
+    bool initializeDevice(int deviceId);  // Initialize a single GPU device
+    bool initializeKernel(GPUDevice* device, dim3 blocks, dim3 threads);  // Initialize kernel and RNG states
     void calculateLaunchParams(const GPUDevice& device, dim3& blocks, dim3& threads);
+    bool launchKernel(GPUDevice* device, dim3 blocks, dim3 threads, 
+                     const std::string& targetPattern, bool isFullAddress,
+                     FoundMatch* result, uint64_t* keysChecked);
 };
 
 } // namespace eth_cracker 
