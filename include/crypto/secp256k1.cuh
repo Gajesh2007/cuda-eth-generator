@@ -31,6 +31,10 @@ __device__ void fieldSub(FieldElement* result, const FieldElement* a, const Fiel
 __device__ void fieldMul(FieldElement* result, const FieldElement* a, const FieldElement* b);
 __device__ void fieldInv(FieldElement* result, const FieldElement* a);
 
+// Montgomery form conversions
+__device__ void toMontgomery(FieldElement* result, const FieldElement* a);
+__device__ void fromMontgomery(FieldElement* result, const FieldElement* a);
+
 // Point arithmetic on the curve
 __device__ void pointDouble(CurvePoint* result, const CurvePoint* p);
 __device__ void pointAdd(CurvePoint* result, const CurvePoint* p, const CurvePoint* q);

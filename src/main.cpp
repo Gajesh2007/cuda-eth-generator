@@ -34,6 +34,10 @@ int main(int argc, char* argv[]) {
         } else if (arg == "-p" || arg == "--pattern") {
             if (i + 1 < argc) {
                 targetPattern = argv[++i];
+                // Remove 0x prefix if present
+                if (targetPattern.substr(0, 2) == "0x") {
+                    targetPattern = targetPattern.substr(2);
+                }
             } else {
                 std::cerr << "Error: Pattern argument missing\n";
                 return 1;
@@ -68,9 +72,8 @@ int main(int argc, char* argv[]) {
         
         // Main loop - print statistics until interrupted
         while (g_running) {
-            std::cout << "\rKeys checked: " << gpuManager.getTotalKeysChecked() 
-                     << " (" << gpuManager.getKeysPerSecond() << " keys/s)" << std::flush;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            gpuManager.getKeysPerSecond();  // This will print progress
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Update 10 times per second
         }
         
         std::cout << "\nStopping...\n";

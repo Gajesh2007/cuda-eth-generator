@@ -14,11 +14,16 @@ constexpr int PRIVKEY_LEN = 32;
 // Uncompressed public key is 65 bytes (0x04 + 32 bytes X + 32 bytes Y)
 constexpr int PUBKEY_LEN = 65;
 
+// GPU kernel configuration
+constexpr int BLOCK_SIZE = 256;  // Threads per block
+constexpr int KEYS_PER_THREAD = 256;  // Each thread processes this many keys before updating counter
+constexpr int MAX_BLOCKS_PER_SM = 16;  // Maximum blocks per streaming multiprocessor
+
 // Structure to hold a found match
 struct FoundMatch {
     uint8_t privateKey[PRIVKEY_LEN];
     uint8_t address[ETH_ADDR_LEN];
-    bool found;
+    volatile int found;  // Using int instead of bool for atomic operations
 };
 
 // CUDA kernel declarations
@@ -40,10 +45,13 @@ extern "C" {
     __device__ void addressToHex(const uint8_t* address, char* hexString);
 }
 
+// Forward declarations
+struct GPUDevice;
+
 // Host-side function declarations
-bool initializeKernel(int deviceId, dim3 blocks, dim3 threads);
+bool initializeKernel(GPUDevice* device, dim3 blocks, dim3 threads);
 bool launchKernel(
-    int deviceId,
+    GPUDevice* device,
     dim3 blocks,
     dim3 threads,
     const std::string& targetPattern,
