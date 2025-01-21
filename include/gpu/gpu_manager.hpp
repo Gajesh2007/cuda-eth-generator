@@ -132,10 +132,19 @@ struct GPUDevice {
     void* d_result;
     void* d_keysChecked;
     
-    // Device context
-    cudaStream_t stream;
-
-    GPUDevice() : deviceId(-1), d_rngStates(nullptr), d_targetPattern(nullptr), d_result(nullptr), d_keysChecked(nullptr), stream(nullptr) {}
+    // Device streams
+    cudaStream_t computeStream;
+    cudaStream_t copyStream;  // NEW: for async copies & status checks
+    
+    GPUDevice()
+        : deviceId(-1)
+        , d_rngStates(nullptr)
+        , d_targetPattern(nullptr)
+        , d_result(nullptr)
+        , d_keysChecked(nullptr)
+        , computeStream(nullptr)
+        , copyStream(nullptr)
+    {}
     
     ~GPUDevice() {
         if (deviceId >= 0) {
@@ -144,7 +153,8 @@ struct GPUDevice {
             if (d_targetPattern) cudaFree(d_targetPattern);
             if (d_result) cudaFree(d_result);
             if (d_keysChecked) cudaFree(d_keysChecked);
-            if (stream) cudaStreamDestroy(stream);
+            if (computeStream) cudaStreamDestroy(computeStream);
+            if (copyStream) cudaStreamDestroy(copyStream);
         }
     }
     
@@ -164,14 +174,16 @@ struct GPUDevice {
         , d_targetPattern(other.d_targetPattern)
         , d_result(other.d_result)
         , d_keysChecked(other.d_keysChecked)
-        , stream(other.stream)
+        , computeStream(other.computeStream)
+        , copyStream(other.copyStream)
     {
         other.deviceId = -1;
         other.d_rngStates = nullptr;
         other.d_targetPattern = nullptr;
         other.d_result = nullptr;
         other.d_keysChecked = nullptr;
-        other.stream = nullptr;
+        other.computeStream = nullptr;
+        other.copyStream = nullptr;
     }
     
     GPUDevice& operator=(GPUDevice&& other) noexcept {
@@ -183,7 +195,8 @@ struct GPUDevice {
                 if (d_targetPattern) cudaFree(d_targetPattern);
                 if (d_result) cudaFree(d_result);
                 if (d_keysChecked) cudaFree(d_keysChecked);
-                if (stream) cudaStreamDestroy(stream);
+                if (computeStream) cudaStreamDestroy(computeStream);
+                if (copyStream) cudaStreamDestroy(copyStream);
             }
             
             // Move resources from other
@@ -197,7 +210,8 @@ struct GPUDevice {
             d_targetPattern = other.d_targetPattern;
             d_result = other.d_result;
             d_keysChecked = other.d_keysChecked;
-            stream = other.stream;
+            computeStream = other.computeStream;
+            copyStream = other.copyStream;
             
             // Clear other's pointers
             other.deviceId = -1;
@@ -205,7 +219,8 @@ struct GPUDevice {
             other.d_targetPattern = nullptr;
             other.d_result = nullptr;
             other.d_keysChecked = nullptr;
-            other.stream = nullptr;
+            other.computeStream = nullptr;
+            other.copyStream = nullptr;
         }
         return *this;
     }
@@ -221,7 +236,7 @@ public:
     GPUManager& operator=(const GPUManager&) = delete;
     
     bool initialize();  // Initialize all available GPUs
-    bool startCracking(const std::string& targetPattern, bool isFullAddress = false);
+    bool startCracking(const std::string& targetPattern);
     void stopCracking();
     double getKeysPerSecond();
     uint64_t getTotalKeysChecked() const;

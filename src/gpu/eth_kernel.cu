@@ -139,7 +139,7 @@ bool initializeKernel(GPUDevice* device, dim3 blocks, dim3 threads) {
     // Initialize RNG states
     std::cout << "Initializing RNG states" << std::endl;
     unsigned int seed = static_cast<unsigned int>(time(nullptr)) + device->deviceId;  // Different seed per device
-    initRNG<<<blocks, threads, 0, device->stream>>>(seed, static_cast<curandState*>(device->d_rngStates));
+    initRNG<<<blocks, threads, 0, device->computeStream>>>(seed, static_cast<curandState*>(device->d_rngStates));
     
     error = cudaGetLastError();
     if (error != cudaSuccess) {
@@ -147,7 +147,7 @@ bool initializeKernel(GPUDevice* device, dim3 blocks, dim3 threads) {
         return false;
     }
     
-    error = cudaStreamSynchronize(device->stream);
+    error = cudaStreamSynchronize(device->computeStream);
     if (error != cudaSuccess) {
         std::cerr << "Failed to synchronize after RNG init: " << cudaGetErrorString(error) << std::endl;
         return false;
@@ -182,7 +182,7 @@ bool launchKernel(
     std::cout << "Target pattern: '" << targetPattern << "' (length: " << targetPattern.length() << ")" << std::endl;
     
     // Launch kernel with proper error checking
-    generateAndCheckAddresses<<<blocks, threads, 0, device->stream>>>(
+    generateAndCheckAddresses<<<blocks, threads, 0, device->computeStream>>>(
         static_cast<curandState*>(device->d_rngStates),
         static_cast<const char*>(device->d_targetPattern),
         targetPattern.length(),

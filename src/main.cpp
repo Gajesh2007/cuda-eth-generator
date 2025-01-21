@@ -66,15 +66,15 @@ int main(int argc, char* argv[]) {
         }
         
         std::cout << "Starting address search for pattern: " << targetPattern << "\n";
-        if (!manager.startCracking(targetPattern, isFullAddress)) {
-            std::cerr << "Failed to start cracking process\n";
+        // Start cracking process
+        if (!manager.startCracking(targetPattern)) {
+            std::cerr << "Failed to start cracking process" << std::endl;
             return 1;
         }
         
-        // Main loop - print statistics until interrupted
+        // Wait for interrupt
         while (g_running) {
-            manager.getKeysPerSecond();  // This will print progress
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));  // Update 10 times per second
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         
         std::cout << "\nStopping...\n";
